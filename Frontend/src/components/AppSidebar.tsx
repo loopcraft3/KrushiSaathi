@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import farmerAvatar from '@/assets/farmer-avatar.png';
+import { Tractor } from 'lucide-react';
 
 // Navigation items with translation keys
 const navigationItems = [
@@ -33,6 +34,7 @@ const navigationItems = [
   { titleKey: 'nav.schemes', url: '/schemes', icon: FileText },
   { titleKey: 'nav.fertilizer', url: '/fertilizer', icon: Sparkles },
   { titleKey: 'nav.cropHealth', url: '/crop-health', icon: Camera },
+  { titleKey: 'nav.rental', url: '/rental', icon: Tractor },
 ];
 
 const userItems = [

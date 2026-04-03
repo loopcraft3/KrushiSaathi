@@ -20,6 +20,8 @@ import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound'; // Added missing import
 import './i18n'; // Initialize i18n
+import EquipmentRental from './pages/EquipmentRental';
+
 
 const App: React.FC = (): JSX.Element => {
   const [bubblePosition, setBubblePosition] = useState<{ x: number; y: number }>({ 
@@ -98,6 +100,7 @@ const App: React.FC = (): JSX.Element => {
                           <Route path="/notifications" element={<Notifications />} />
                           <Route path="/profile" element={<Profile />} />
                           <Route path="/settings" element={<Settings />} />
+                          <Route path="/rental" element={<EquipmentRental />} />
                           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                           <Route path="*" element={<NotFound />} />
                         </Routes>

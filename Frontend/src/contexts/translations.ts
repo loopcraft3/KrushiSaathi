@@ -15,6 +15,7 @@ export const fallbackTranslations: Record<string, Record<string, string>> = {
     'nav.notifications': 'Notifications',
     'nav.profile': 'Profile',
     'nav.settings': 'Settings',
+    'nav.rental': 'Equipment Rental',
   },
   hi: {
     // App
@@ -31,6 +32,7 @@ export const fallbackTranslations: Record<string, Record<string, string>> = {
     'nav.notifications': 'सूचनाएं',
     'nav.profile': 'प्रोफ़ाइल',
     'nav.settings': 'सेटिंग्स',
+    'nav.rental': 'उपकरण किराया',
   },
   // Add more languages as needed
 };

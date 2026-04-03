@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 
 from models.schemas import ChatRequest, ChatResponse, ChatMessage, Source, InputRate
+#from models.rental_schemas import ChatRequest, ChatResponse, ChatMessage, Source, InputRate
 from services.llm_service import llm_service
 from services.rag_service import rag_service
 from services.tts_service import tts_service

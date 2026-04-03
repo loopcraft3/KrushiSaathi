@@ -8,6 +8,8 @@ env/
 venv/
 ENV/
 .venv
+*.pyc
+.env
 
 # Environment
 .env

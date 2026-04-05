@@ -21,6 +21,7 @@ import Settings from './pages/Settings';
 import NotFound from './pages/NotFound'; // Added missing import
 import './i18n'; // Initialize i18n
 import EquipmentRental from './pages/EquipmentRental';
+import { RoleProvider } from '@/contexts/RoleContext';
 
 
 const App: React.FC = (): JSX.Element => {
@@ -62,6 +63,7 @@ const App: React.FC = (): JSX.Element => {
   return (
     <ErrorBoundary>
       <LanguageProvider>
+        <RoleProvider>  
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <Toaster />
@@ -114,6 +116,7 @@ const App: React.FC = (): JSX.Element => {
             <Sonner position="bottom-right" />
           </TooltipProvider>
         </QueryClientProvider>
+         </RoleProvider>
       </LanguageProvider>
     </ErrorBoundary>
   );

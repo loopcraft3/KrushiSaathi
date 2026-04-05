@@ -1,19 +1,12 @@
-/**
- * Rental API Service
- * Handles all API calls for the Equipment Rental feature
- * Connects to FastAPI backend at /api/rental/*
- */
-
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-
-// Temporary user ID for demo — replace with real auth later
-const TEMP_USER_ID = 'farmer_demo_user_001';
 
 export interface Equipment {
   _id: string;
   name: string;
   type: string;
   price_per_hour: number;
+  vendor_id?: string;
+  image_url?: string;
 }
 
 export interface Booking {
@@ -25,56 +18,94 @@ export interface Booking {
   status: 'active' | 'cancelled';
   total_price: number;
   equipment_name?: string;
+  equipment_image?: string;
 }
 
-export interface BookingCreatePayload {
-  equipment_id: string;
-  start_time: string;
-  end_time: string;
-}
+const headers = (userId: string) => ({ 'X-User-Id': userId });
 
-/** Fetch all available equipment */
+// ── FARMER ──────────────────────────────────────────
+
 export async function getAllEquipment(): Promise<Equipment[]> {
-  const response = await fetch(`${API_BASE_URL}/api/rental/equipment`, {
-    headers: { 'X-User-Id': TEMP_USER_ID },
-  });
-  if (!response.ok) throw new Error('Failed to fetch equipment');
-  const data = await response.json();
-  return data.data;
+  const res = await fetch(`${API_BASE_URL}/api/rental/equipment`);
+  if (!res.ok) throw new Error('Failed to fetch equipment');
+  return (await res.json()).data;
 }
 
-/** Create a new booking */
-export async function createBooking(payload: BookingCreatePayload): Promise<Booking> {
-  const response = await fetch(`${API_BASE_URL}/api/rental/book`, {
+export async function createBooking(userId: string, payload: {
+  equipment_id: string; start_time: string; end_time: string;
+}): Promise<Booking> {
+  const res = await fetch(`${API_BASE_URL}/api/rental/book`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-User-Id': TEMP_USER_ID,
-    },
+    headers: { 'Content-Type': 'application/json', ...headers(userId) },
     body: JSON.stringify(payload),
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.detail || 'Failed to create booking');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to create booking');
   return data.data;
 }
 
-/** Get all active bookings for current user */
-export async function getMyBookings(): Promise<Booking[]> {
-  const response = await fetch(`${API_BASE_URL}/api/rental/bookings`, {
-    headers: { 'X-User-Id': TEMP_USER_ID },
-  });
-  if (!response.ok) throw new Error('Failed to fetch bookings');
-  const data = await response.json();
-  return data.data;
+export async function getMyBookings(userId: string): Promise<Booking[]> {
+  const res = await fetch(`${API_BASE_URL}/api/rental/bookings`, { headers: headers(userId) });
+  if (!res.ok) throw new Error('Failed to fetch bookings');
+  return (await res.json()).data;
 }
 
-/** Cancel a booking */
-export async function cancelBooking(bookingId: string): Promise<Booking> {
-  const response = await fetch(`${API_BASE_URL}/api/rental/book/${bookingId}`, {
+export async function getBookingHistory(userId: string): Promise<Booking[]> {
+  const res = await fetch(`${API_BASE_URL}/api/rental/bookings/history`, { headers: headers(userId) });
+  if (!res.ok) throw new Error('Failed to fetch history');
+  return (await res.json()).data;
+}
+
+export async function cancelBooking(userId: string, bookingId: string): Promise<Booking> {
+  const res = await fetch(`${API_BASE_URL}/api/rental/book/${bookingId}`, {
     method: 'DELETE',
-    headers: { 'X-User-Id': TEMP_USER_ID },
+    headers: headers(userId),
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.detail || 'Failed to cancel booking');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to cancel');
   return data.data;
+}
+
+// ── VENDOR ──────────────────────────────────────────
+
+export async function getVendorEquipment(userId: string): Promise<Equipment[]> {
+  const res = await fetch(`${API_BASE_URL}/api/rental/vendor/equipment`, { headers: headers(userId) });
+  if (!res.ok) throw new Error('Failed to fetch vendor equipment');
+  return (await res.json()).data;
+}
+
+export async function addEquipment(userId: string, formData: FormData): Promise<Equipment> {
+  const res = await fetch(`${API_BASE_URL}/api/rental/vendor/equipment`, {
+    method: 'POST',
+    headers: headers(userId),
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to add equipment');
+  return data.data;
+}
+
+export async function updateEquipment(userId: string, equipmentId: string, formData: FormData): Promise<Equipment> {
+  const res = await fetch(`${API_BASE_URL}/api/rental/vendor/equipment/${equipmentId}`, {
+    method: 'PUT',
+    headers: headers(userId),
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Failed to update');
+  return data.data;
+}
+
+export async function deleteEquipment(userId: string, equipmentId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/rental/vendor/equipment/${equipmentId}`, {
+    method: 'DELETE',
+    headers: headers(userId),
+  });
+  if (!res.ok) throw new Error('Failed to delete equipment');
+}
+
+export async function getVendorBookings(userId: string): Promise<Booking[]> {
+  const res = await fetch(`${API_BASE_URL}/api/rental/vendor/bookings`, { headers: headers(userId) });
+  if (!res.ok) throw new Error('Failed to fetch vendor bookings');
+  return (await res.json()).data;
 }

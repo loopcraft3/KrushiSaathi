@@ -109,3 +109,14 @@ export async function getVendorBookings(userId: string): Promise<Booking[]> {
   if (!res.ok) throw new Error('Failed to fetch vendor bookings');
   return (await res.json()).data;
 }
+
+export interface BookedSlot {
+  start_time: string;
+  end_time: string;
+}
+
+export async function getEquipmentAvailability(equipmentId: string): Promise<BookedSlot[]> {
+  const res = await fetch(`${API_BASE_URL}/api/rental/equipment/${equipmentId}/availability`);
+  if (!res.ok) throw new Error('Failed to fetch availability');
+  return (await res.json()).data;
+}

@@ -11,9 +11,30 @@ ENV/
 *.pyc
 .env
 
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+
+# Database
+*.db
+*.sqlite
+
+# Uploaded images — these are local only
+static/equipment_images/
+
 # Environment
 .env
 .env.local
+.env.production
 
 # Vector DB
 data/faiss_index/

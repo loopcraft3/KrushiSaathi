@@ -184,3 +184,20 @@ async def get_vendor_bookings(x_user_id: Optional[str] = Header(None)):
         return {"success": True, "message": "Vendor bookings fetched", "data": bookings}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/equipment/{equipment_id}/availability")
+async def get_equipment_availability(equipment_id: str):
+    """Get all booked time slots for a specific equipment"""
+    try:
+        bookings = []
+        async for booking in rental_service.bookings_collection.find({
+            "equipment_id": equipment_id,
+            "status": "active"
+        }):
+            bookings.append({
+                "start_time": booking["start_time"].isoformat(),
+                "end_time": booking["end_time"].isoformat(),
+            })
+        return {"success": True, "message": "Availability fetched", "data": bookings}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

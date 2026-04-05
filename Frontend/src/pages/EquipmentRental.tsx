@@ -1,33 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { useRole } from '@/contexts/RoleContext';
-import RoleSelector from './RoleSelector';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Tractor, Calendar, Clock, IndianRupee, X,
   CheckCircle, AlertCircle, Plus, Pencil, Trash2,
-  Store, History, ArrowLeft, Upload
+  Store, History, ArrowLeft, Upload, Search,
+  Wheat, Droplets, Leaf, Package, ChevronRight
 } from 'lucide-react';
+import { useRole } from '@/contexts/RoleContext';
+import RoleSelector from './RoleSelector';
 import {
   getAllEquipment, createBooking, getMyBookings, getBookingHistory,
   cancelBooking, getVendorEquipment, addEquipment, updateEquipment,
-  deleteEquipment, getVendorBookings, Equipment, Booking
+  deleteEquipment, getVendorBookings,
 } from '@/services/rentalApi';
+import type { Equipment, Booking } from '@/services/rentalApi';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1605338803502-2f47e6b891b2?w=400&h=250&fit=crop';
+// Default images per equipment type
+const CATEGORY_IMAGES: Record<string, string> = {
+  'Tractor': '/equipment-images/tractor.jpg',
+  'Harvesting Equipment': '/equipment-images/harvester.jpg',
+  'Spraying Equipment': '/equipment-images/sprayer.jpg',
+  'Tiller': '/equipment-images/tiller.jpg',
+  'Tillage Equipment': '/equipment-images/tiller.jpg',
+  'Sowing Equipment': '/equipment-images/sowing.jpg',
+};
 
+const DEFAULT_IMAGE = '/equipment-images/default.jpg';
+const getEquipmentImage = (src?: string, type?: string): string => {
+  if (src) return src.startsWith('/static') ? `${API_BASE}${src}` : src;
+  if (type && CATEGORY_IMAGES[type]) return CATEGORY_IMAGES[type];
+  return DEFAULT_IMAGE;
+};
 // ── IMAGE COMPONENT ──────────────────────────────────────────────────
-const EquipmentImage: React.FC<{ src?: string; alt: string; className?: string }> = ({ src, alt, className }) => (
+const EquipmentImage: React.FC<{ src?: string; alt: string; className?: string; type?: string }> = ({ src, alt, className, type }) => (
   <img
-    src={src ? (src.startsWith('/static') ? `${API_BASE}${src}` : src) : DEFAULT_IMAGE}
+    src={getEquipmentImage(src, type)}
     alt={alt}
     className={className}
     onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE; }}
   />
 );
-
 // ── ALERT COMPONENT ──────────────────────────────────────────────────
 const Alert: React.FC<{ type: 'error' | 'success'; message: string; onClose: () => void }> = ({ type, message, onClose }) => (
   <div className={`mb-4 flex items-center gap-2 p-4 rounded-xl border text-sm ${
@@ -40,6 +55,87 @@ const Alert: React.FC<{ type: 'error' | 'success'; message: string; onClose: () 
     <button onClick={onClose} className="ml-auto"><X className="h-4 w-4" /></button>
   </div>
 );
+
+// ── CATEGORIES ───────────────────────────────────────────────────────
+const categories = [
+  { label: 'All Equipment', value: '', icon: Package, color: 'bg-gray-500/10 text-gray-600', border: 'hover:border-gray-400' },
+  { label: 'Tractors', value: 'Tractor', icon: Tractor, color: 'bg-green-500/10 text-green-600', border: 'hover:border-green-400' },
+  { label: 'Harvesters', value: 'Harvesting Equipment', icon: Wheat, color: 'bg-yellow-500/10 text-yellow-600', border: 'hover:border-yellow-400' },
+  { label: 'Sprayers', value: 'Spraying Equipment', icon: Droplets, color: 'bg-blue-500/10 text-blue-600', border: 'hover:border-blue-400' },
+  { label: 'Tillers', value: 'Tiller', icon: Leaf, color: 'bg-emerald-500/10 text-emerald-600', border: 'hover:border-emerald-400' },
+  { label: 'Sowing', value: 'Sowing Equipment', icon: Leaf, color: 'bg-lime-500/10 text-lime-600', border: 'hover:border-lime-400' },
+  { label: 'Tillage', value: 'Tillage Equipment', icon: Tractor, color: 'bg-orange-500/10 text-orange-600', border: 'hover:border-orange-400' },
+];
+
+// ── CATEGORY SCREEN ──────────────────────────────────────────────────
+const CategoryScreen: React.FC<{
+  onSelect: (category: string, label: string) => void;
+  equipment: Equipment[];
+}> = ({ onSelect, equipment }) => {
+  const getCount = (value: string) => {
+    if (!value) return equipment.length;
+    return equipment.filter(e => e.type === value).length;
+  };
+
+  const dynamicTypes = [...new Set(equipment.map(e => e.type))];
+  const knownValues = categories.map(c => c.value).filter(Boolean);
+  const extraCategories = dynamicTypes
+    .filter(type => !knownValues.includes(type))
+    .map(type => ({
+      label: type,
+      value: type,
+      icon: Package,
+      color: 'bg-purple-500/10 text-purple-600',
+      border: 'hover:border-purple-400',
+    }));
+
+  const allCategories = [...categories, ...extraCategories];
+
+  return (
+    <div>
+      <div className="mb-8 text-center">
+        <h2 className="text-2xl font-bold text-foreground mb-2">What are you looking for?</h2>
+        <p className="text-muted-foreground">Select a category to browse equipment</p>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {allCategories.map((cat) => {
+          const count = getCount(cat.value);
+          if (count === 0 && cat.value !== '') return null;
+          return (
+            <button
+              key={cat.value}
+              onClick={() => onSelect(cat.value, cat.label)}
+              className={`group rounded-2xl border-2 border-border ${cat.border} bg-card hover:shadow-lg transition-all duration-300 hover:-translate-y-1 text-left overflow-hidden`}
+            >
+              {/* Category Image */}
+              <div className="w-full h-32 overflow-hidden">
+                <img
+                  src={cat.value ? CATEGORY_IMAGES[cat.value] || DEFAULT_IMAGE : DEFAULT_IMAGE}
+                  alt={cat.label}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE; }}
+                />
+              </div>
+              {/* Content */}
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className={`h-8 w-8 rounded-lg ${cat.color} flex items-center justify-center`}>
+                    <cat.icon className="h-4 w-4" />
+                  </div>
+                  <h3 className="font-bold text-foreground">{cat.label}</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">{count} available</p>
+                <div className="mt-2 flex items-center gap-1 text-primary text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  Browse <ChevronRight className="h-4 w-4" />
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 // ── FARMER VIEW ──────────────────────────────────────────────────────
 const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
@@ -54,6 +150,13 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
   const [showHistory, setShowHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Category and search state
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategoryLabel, setSelectedCategoryLabel] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [sortPrice, setSortPrice] = useState('');
 
   useEffect(() => { loadData(); }, []);
 
@@ -74,6 +177,23 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
       setLoading(false);
     }
   };
+
+  const equipmentTypes = [...new Set(equipment.map(e => e.type))];
+
+  const filteredEquipment = equipment
+    .filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.type.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesType = filterType ? item.type === filterType : true;
+      const matchesCategory = selectedCategory !== null && selectedCategory !== ''
+        ? item.type === selectedCategory : true;
+      return matchesSearch && matchesType && matchesCategory;
+    })
+    .sort((a, b) => {
+      if (sortPrice === 'asc') return a.price_per_hour - b.price_per_hour;
+      if (sortPrice === 'desc') return b.price_per_hour - a.price_per_hour;
+      return 0;
+    });
 
   const handleBook = async () => {
     if (!selectedEquipment || !startTime || !endTime) {
@@ -119,28 +239,119 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
     return (hours * selectedEquipment.price_per_hour).toFixed(2);
   };
 
+  // Show category screen first
+  if (selectedCategory === null) {
+    return (
+      <CategoryScreen
+        equipment={equipment}
+        onSelect={(value, label) => {
+          setSelectedCategory(value);
+          setSelectedCategoryLabel(label);
+        }}
+      />
+    );
+  }
+
   return (
     <div>
       {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
       {success && <Alert type="success" message={success} onClose={() => setSuccess(null)} />}
 
+      {/* Back to categories */}
+      <div className="flex items-center gap-3 mb-6">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setSelectedCategory(null);
+            setFilterType('');
+            setSearchQuery('');
+            setSortPrice('');
+          }}
+        >
+          <ArrowLeft className="h-4 w-4 mr-1" /> All Categories
+        </Button>
+        <div>
+          <h2 className="text-xl font-bold text-foreground">{selectedCategoryLabel}</h2>
+          <p className="text-sm text-muted-foreground">{filteredEquipment.length} equipment available</p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
 
-          {/* Equipment Grid */}
+          {/* Equipment Card */}
           <Card>
             <CardHeader>
               <CardTitle>Available Equipment</CardTitle>
-              <CardDescription>Click any equipment to select it for booking</CardDescription>
+              <CardDescription>Search and filter to find the right equipment</CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Search and Filter Bar */}
+              <div className="flex flex-col md:flex-row gap-3 mb-6">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search equipment..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
+
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                >
+                  <option value="">All Types</option>
+                  {equipmentTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={sortPrice}
+                  onChange={(e) => setSortPrice(e.target.value)}
+                  className="px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                >
+                  <option value="">Sort by Price</option>
+                  <option value="asc">Price: Low to High</option>
+                  <option value="desc">Price: High to Low</option>
+                </select>
+
+                {(searchQuery || filterType || sortPrice) && (
+                  <Button variant="outline" size="sm" onClick={() => {
+                    setSearchQuery('');
+                    setFilterType('');
+                    setSortPrice('');
+                  }}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+
+              {(searchQuery || filterType || sortPrice) && (
+                <p className="text-sm text-muted-foreground mb-4">
+                  Showing {filteredEquipment.length} of {equipment.length} equipment
+                </p>
+              )}
+
               {loading ? (
                 <div className="text-center py-10 text-muted-foreground">Loading equipment...</div>
-              ) : equipment.length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground">No equipment available yet.</div>
+              ) : filteredEquipment.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  {searchQuery || filterType ? 'No equipment matches your search.' : 'No equipment available yet.'}
+                </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {equipment.map((item) => (
+                  {filteredEquipment.map((item) => (
                     <div
                       key={item._id}
                       onClick={() => setSelectedEquipment(item)}
@@ -150,12 +361,8 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
                           : 'border-border hover:border-primary/50'
                       }`}
                     >
-                      <EquipmentImage
-                        src={item.image_url}
-                        alt={item.name}
-                        className="w-full h-40 object-cover"
-                      />
-                      <div className="p-3">
+                      <EquipmentImage src={item.image_url} alt={item.name} type={item.type} className="..." />
+                       <div className="p-3">
                         <div className="flex items-center justify-between mb-1">
                           <h3 className="font-semibold text-foreground">{item.name}</h3>
                           <Badge variant="secondary">{item.type}</Badge>
@@ -175,7 +382,7 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
             </CardContent>
           </Card>
 
-          {/* Active Bookings */}
+          {/* Bookings Card */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -202,11 +409,8 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
                   <div className="space-y-3">
                     {list.map((booking) => (
                       <div key={booking._id} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/30">
-                        <EquipmentImage
-                          src={booking.equipment_image}
-                          alt={booking.equipment_name || ''}
-                          className="h-14 w-14 rounded-lg object-cover flex-shrink-0"
-                        />
+                        
+                        <EquipmentImage src={item.image_url} alt={item.name} type={item.type} className="..." />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-foreground truncate">{booking.equipment_name}</p>
                           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
@@ -243,6 +447,7 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
               })()}
             </CardContent>
           </Card>
+
         </div>
 
         {/* Booking Form */}
@@ -257,8 +462,8 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
             <CardContent className="space-y-4">
               {selectedEquipment ? (
                 <div className="rounded-xl overflow-hidden border border-primary/20">
-                  <EquipmentImage src={selectedEquipment.image_url} alt={selectedEquipment.name} className="w-full h-32 object-cover" />
-                  <div className="p-3 bg-primary/5 flex items-center justify-between">
+                 <EquipmentImage src={item.image_url} alt={item.name} type={item.type} className="..." />
+                 <div className="p-3 bg-primary/5 flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-sm">{selectedEquipment.name}</p>
                       <p className="text-xs text-muted-foreground">₹{selectedEquipment.price_per_hour}/hour</p>
@@ -307,6 +512,7 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
             </CardContent>
           </Card>
         </div>
+
       </div>
     </div>
   );
@@ -323,8 +529,6 @@ const VendorView: React.FC<{ userId: string }> = ({ userId }) => {
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-
-  // Form state
   const [form, setForm] = useState({ name: '', type: '', price_per_hour: '' });
   const [imageFile, setImageFile] = useState<File | null>(null);
 
@@ -457,7 +661,6 @@ const VendorView: React.FC<{ userId: string }> = ({ userId }) => {
               </div>
             </div>
 
-            {/* Image Upload */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Equipment Image (optional)</label>
               <div className="flex items-center gap-4">
@@ -536,7 +739,7 @@ const VendorView: React.FC<{ userId: string }> = ({ userId }) => {
         </CardContent>
       </Card>
 
-      {/* Bookings on my equipment */}
+      {/* Vendor Bookings */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -598,7 +801,6 @@ const EquipmentRental: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">

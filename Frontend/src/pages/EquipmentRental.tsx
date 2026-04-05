@@ -13,9 +13,9 @@ import RoleSelector from './RoleSelector';
 import {
   getAllEquipment, createBooking, getMyBookings, getBookingHistory,
   cancelBooking, getVendorEquipment, addEquipment, updateEquipment,
-  deleteEquipment, getVendorBookings,
+  deleteEquipment, getVendorBookings, getEquipmentAvailability,
 } from '@/services/rentalApi';
-import type { Equipment, Booking } from '@/services/rentalApi';
+import type { Equipment, Booking, BookedSlot } from '@/services/rentalApi';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 // Default images per equipment type
@@ -66,7 +66,313 @@ const categories = [
   { label: 'Sowing', value: 'Sowing Equipment', icon: Leaf, color: 'bg-lime-500/10 text-lime-600', border: 'hover:border-lime-400' },
   { label: 'Tillage', value: 'Tillage Equipment', icon: Tractor, color: 'bg-orange-500/10 text-orange-600', border: 'hover:border-orange-400' },
 ];
+// ── AVAILABILITY CALENDAR POPUP ──────────────────────────────────────
+const AvailabilityPopup: React.FC<{
+  equipment: Equipment;
+  onClose: () => void;
+  onBook: (equipment: Equipment, start: string, end: string) => void;
+}> = ({ equipment, onClose, onBook }) => {
+  const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedStart, setSelectedStart] = useState<Date | null>(null);
+  const [selectedEnd, setSelectedEnd] = useState<Date | null>(null);
+  const [startTime, setStartTime] = useState('08:00');
+  const [endTime, setEndTime] = useState('17:00');
+  const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    loadAvailability();
+  }, []);
+
+  const loadAvailability = async () => {
+    try {
+      setLoading(true);
+      const slots = await getEquipmentAvailability(equipment._id);
+      setBookedSlots(slots);
+    } catch (e: any) {
+      setError('Could not load availability');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check if a date has any booking overlap
+  const isDateBooked = (date: Date): boolean => {
+    return bookedSlots.some(slot => {
+      const slotStart = new Date(slot.start_time);
+      const slotEnd = new Date(slot.end_time);
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(date);
+      dayEnd.setHours(23, 59, 59, 999);
+      return slotStart < dayEnd && slotEnd > dayStart;
+    });
+  };
+
+  const isDateInPast = (date: Date): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date < today;
+  };
+
+  const isDateSelected = (date: Date): boolean => {
+    if (!selectedStart) return false;
+    if (selectedEnd) {
+      return date >= selectedStart && date <= selectedEnd;
+    }
+    return date.toDateString() === selectedStart.toDateString();
+  };
+
+  const isDateStart = (date: Date): boolean =>
+    selectedStart ? date.toDateString() === selectedStart.toDateString() : false;
+
+  const isDateEnd = (date: Date): boolean =>
+    selectedEnd ? date.toDateString() === selectedEnd.toDateString() : false;
+
+  const handleDateClick = (date: Date) => {
+    if (isDateBooked(date) || isDateInPast(date)) return;
+
+    if (!selectedStart || (selectedStart && selectedEnd)) {
+      // Start fresh selection
+      setSelectedStart(date);
+      setSelectedEnd(null);
+    } else {
+      // Set end date
+      if (date < selectedStart) {
+        setSelectedEnd(selectedStart);
+        setSelectedStart(date);
+      } else {
+        setSelectedEnd(date);
+      }
+    }
+  };
+
+  // Build calendar days for current month
+  const buildCalendarDays = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days: (Date | null)[] = [];
+
+    for (let i = 0; i < firstDay; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(new Date(year, month, i));
+    return days;
+  };
+
+  const calendarDays = buildCalendarDays();
+  const monthName = currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  const handleConfirm = () => {
+    if (!selectedStart) {
+      setError('Please select a start date');
+      return;
+    }
+    const endDate = selectedEnd || selectedStart;
+
+    const start = new Date(selectedStart);
+    const [sh, sm] = startTime.split(':');
+    start.setHours(parseInt(sh), parseInt(sm), 0, 0);
+
+    const end = new Date(endDate);
+    const [eh, em] = endTime.split(':');
+    end.setHours(parseInt(eh), parseInt(em), 0, 0);
+
+    if (end <= start) {
+      setError('End time must be after start time');
+      return;
+    }
+
+    onBook(equipment, start.toISOString(), end.toISOString());
+    onClose();
+  };
+
+  const estimatedPrice = () => {
+    if (!selectedStart) return null;
+    const endDate = selectedEnd || selectedStart;
+    const start = new Date(selectedStart);
+    const [sh, sm] = startTime.split(':');
+    start.setHours(parseInt(sh), parseInt(sm));
+    const end = new Date(endDate);
+    const [eh, em] = endTime.split(':');
+    end.setHours(parseInt(eh), parseInt(em));
+    if (end <= start) return null;
+    const hours = (end.getTime() - start.getTime()) / 3600000;
+    return (hours * equipment.price_per_hour).toFixed(2);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <EquipmentImage
+              src={equipment.image_url}
+              alt={equipment.name}
+              type={equipment.type}
+              className="h-12 w-16 rounded-lg object-cover"
+            />
+            <div>
+              <h2 className="font-bold text-foreground">{equipment.name}</h2>
+              <p className="text-sm text-primary font-semibold">₹{equipment.price_per_hour}/hour</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {error && (
+            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              {error}
+              <button onClick={() => setError(null)} className="ml-auto"><X className="h-3 w-3" /></button>
+            </div>
+          )}
+
+          {/* Legend */}
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="h-3 w-3 rounded-full bg-red-400 inline-block" /> Booked
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-3 w-3 rounded-full bg-primary inline-block" /> Selected
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-3 w-3 rounded-full bg-green-400 inline-block" /> Available
+            </span>
+          </div>
+
+          {/* Calendar */}
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading availability...</div>
+          ) : (
+            <div>
+              {/* Month Navigation */}
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+                  className="p-2 rounded-lg hover:bg-muted transition-colors"
+                >
+                  ←
+                </button>
+                <h3 className="font-semibold text-foreground">{monthName}</h3>
+                <button
+                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+                  className="p-2 rounded-lg hover:bg-muted transition-colors"
+                >
+                  →
+                </button>
+              </div>
+
+              {/* Day Headers */}
+              <div className="grid grid-cols-7 mb-1">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="text-center text-xs font-medium text-muted-foreground py-1">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar Grid */}
+              <div className="grid grid-cols-7 gap-1">
+                {calendarDays.map((date, idx) => {
+                  if (!date) return <div key={idx} />;
+                  const booked = isDateBooked(date);
+                  const past = isDateInPast(date);
+                  const selected = isDateSelected(date);
+                  const isStart = isDateStart(date);
+                  const isEnd = isDateEnd(date);
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleDateClick(date)}
+                      disabled={booked || past}
+                      className={`
+                        h-9 w-full rounded-lg text-sm font-medium transition-all duration-150
+                        ${past ? 'text-muted-foreground/30 cursor-not-allowed' : ''}
+                        ${booked ? 'bg-red-100 text-red-400 cursor-not-allowed line-through' : ''}
+                        ${selected && !booked && !past ? 'bg-primary/20 text-primary' : ''}
+                        ${(isStart || isEnd) && !booked ? 'bg-primary text-primary-foreground shadow-md scale-105' : ''}
+                        ${!booked && !past && !selected ? 'hover:bg-green-100 hover:text-green-700 text-foreground' : ''}
+                      `}
+                    >
+                      {date.getDate()}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Time Selection */}
+          {selectedStart && (
+            <div className="p-3 rounded-xl bg-muted/50 border border-border space-y-3">
+              <p className="text-sm font-medium text-foreground">
+                Selected: {selectedStart.toLocaleDateString('en-IN', { dateStyle: 'medium' })}
+                {selectedEnd && selectedEnd.toDateString() !== selectedStart.toDateString() &&
+                  ` → ${selectedEnd.toLocaleDateString('en-IN', { dateStyle: 'medium' })}`
+                }
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Start Time</label>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">End Time</label>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+              </div>
+
+              {/* Estimated Price */}
+              {estimatedPrice() && (
+                <div className="flex items-center justify-between p-2 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <span className="text-sm text-muted-foreground">Estimated Total</span>
+                  <span className="text-lg font-bold text-green-700 flex items-center gap-1">
+                    <IndianRupee className="h-4 w-4" />{estimatedPrice()}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={handleConfirm}
+              disabled={!selectedStart}
+            >
+              Confirm Booking
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 // ── CATEGORY SCREEN ──────────────────────────────────────────────────
 const CategoryScreen: React.FC<{
   onSelect: (category: string, label: string) => void;
@@ -150,6 +456,7 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
   const [showHistory, setShowHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [popupEquipment, setPopupEquipment] = useState<Equipment | null>(null);
 
   // Category and search state
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -254,6 +561,28 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
 
   return (
     <div>
+      {/* Availability Popup */}
+      {popupEquipment && (
+        <AvailabilityPopup
+          equipment={popupEquipment}
+          onClose={() => setPopupEquipment(null)}
+          onBook={async (equipment, start, end) => {
+            try {
+              setError(null);
+              await createBooking(userId, {
+                equipment_id: equipment._id,
+                start_time: start,
+                end_time: end,
+              });
+              setSuccess(`✅ ${equipment.name} booked successfully!`);
+              await loadData();
+              setTimeout(() => setSuccess(null), 4000);
+            } catch (e: any) {
+              setError(e.message);
+            }
+          }}
+        />
+      )}
       {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
       {success && <Alert type="success" message={success} onClose={() => setSuccess(null)} />}
 
@@ -354,9 +683,9 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
                   {filteredEquipment.map((item) => (
                     <div
                       key={item._id}
-                      onClick={() => setSelectedEquipment(item)}
+                      onClick={() => setPopupEquipment(item)}
                       className={`rounded-xl border-2 cursor-pointer overflow-hidden transition-all duration-200 hover:shadow-lg ${
-                        selectedEquipment?._id === item._id
+                        popupEquipment?._id === item._id
                           ? 'border-primary shadow-md'
                           : 'border-border hover:border-primary/50'
                       }`}
@@ -410,7 +739,11 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
                     {list.map((booking) => (
                       <div key={booking._id} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/30">
                         
-                        <EquipmentImage src={item.image_url} alt={item.name} type={item.type} className="..." />
+                       <EquipmentImage 
+                        src={booking.equipment_image} 
+                        alt={booking.equipment_name} 
+                        className="..." 
+                      />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-foreground truncate">{booking.equipment_name}</p>
                           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
@@ -461,21 +794,36 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
             </CardHeader>
             <CardContent className="space-y-4">
               {selectedEquipment ? (
-                <div className="rounded-xl overflow-hidden border border-primary/20">
-                 <EquipmentImage src={item.image_url} alt={item.name} type={item.type} className="..." />
-                 <div className="p-3 bg-primary/5 flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-sm">{selectedEquipment.name}</p>
-                      <p className="text-xs text-muted-foreground">₹{selectedEquipment.price_per_hour}/hour</p>
-                    </div>
-                    <button onClick={() => setSelectedEquipment(null)}><X className="h-4 w-4 text-muted-foreground" /></button>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-4 rounded-xl bg-muted/50 border border-dashed border-border text-center text-sm text-muted-foreground">
-                  ← Select equipment from the list
-                </div>
-              )}
+  <div className="rounded-xl overflow-hidden border border-primary/20">
+    
+    <EquipmentImage 
+      src={selectedEquipment.image_url} 
+      alt={selectedEquipment.name} 
+      type={selectedEquipment.type} 
+      className="..." 
+    />
+
+    <div className="p-3 bg-primary/5 flex items-center justify-between">
+      <div>
+        <p className="font-semibold text-sm">
+          {selectedEquipment.name}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          ₹{selectedEquipment.price_per_hour}/hour
+        </p>
+      </div>
+
+      <button onClick={() => setSelectedEquipment(null)}>
+        <X className="h-4 w-4 text-muted-foreground" />
+      </button>
+    </div>
+
+  </div>
+) : (
+  <div className="p-4 rounded-xl bg-muted/50 border border-dashed border-border text-center text-sm text-muted-foreground">
+    ← Select equipment from the list
+  </div>
+)}
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Start Date & Time</label>

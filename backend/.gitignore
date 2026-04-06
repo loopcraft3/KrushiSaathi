@@ -8,6 +8,28 @@ env/
 venv/
 ENV/
 .venv
+*.pyc
+.env
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+
+# Database
+*.db
+*.sqlite
+
+# Uploaded images — these are local only
+static/equipment_images/
 
 # Node
 node_modules/
@@ -15,6 +37,7 @@ node_modules/
 # Environment
 .env
 .env.local
+.env.production
 
 
 # Data (IMPORTANT)

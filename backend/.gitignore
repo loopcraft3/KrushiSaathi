@@ -31,10 +31,23 @@ __pycache__/
 # Uploaded images — these are local only
 static/equipment_images/
 
+# Node
+node_modules/
+
 # Environment
 .env
 .env.local
 .env.production
+
+
+# Data (IMPORTANT)
+backend/data/docs/
+backend/data/fertilizer_dataset/
+backend/data/crop_dataset/
+backend/data/Plant_leaf_diseases_dataset_without_augmentation/
+
+# Uploads
+backend/uploads/
 
 # Vector DB
 data/faiss_index/

@@ -606,9 +606,8 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-
+      <div className="grid grid-cols-1 gap-6">
+  <div className="space-y-6">
           {/* Equipment Card */}
           <Card>
             <CardHeader>
@@ -783,83 +782,7 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
 
         </div>
 
-        {/* Booking Form */}
-        <div>
-          <Card className="sticky top-4">
-            <CardHeader>
-              <CardTitle>Book Equipment</CardTitle>
-              <CardDescription>
-                {selectedEquipment ? `Booking: ${selectedEquipment.name}` : 'Select equipment from list'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {selectedEquipment ? (
-  <div className="rounded-xl overflow-hidden border border-primary/20">
-    
-    <EquipmentImage 
-      src={selectedEquipment.image_url} 
-      alt={selectedEquipment.name} 
-      type={selectedEquipment.type} 
-      className="..." 
-    />
-
-    <div className="p-3 bg-primary/5 flex items-center justify-between">
-      <div>
-        <p className="font-semibold text-sm">
-          {selectedEquipment.name}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          ₹{selectedEquipment.price_per_hour}/hour
-        </p>
-      </div>
-
-      <button onClick={() => setSelectedEquipment(null)}>
-        <X className="h-4 w-4 text-muted-foreground" />
-      </button>
-    </div>
-
-  </div>
-) : (
-  <div className="p-4 rounded-xl bg-muted/50 border border-dashed border-border text-center text-sm text-muted-foreground">
-    ← Select equipment from the list
-  </div>
-)}
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Start Date & Time</label>
-                <input type="datetime-local" value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  min={new Date().toISOString().slice(0, 16)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium">End Date & Time</label>
-                <input type="datetime-local" value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  min={startTime || new Date().toISOString().slice(0, 16)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-
-              {estimatedPrice() && (
-                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                  <p className="text-xs text-muted-foreground">Estimated Total</p>
-                  <p className="text-xl font-bold text-green-700 flex items-center gap-1">
-                    <IndianRupee className="h-5 w-5" />{estimatedPrice()}
-                  </p>
-                </div>
-              )}
-
-              <Button className="w-full" onClick={handleBook}
-                disabled={bookingLoading || !selectedEquipment || !startTime || !endTime}>
-                {bookingLoading ? 'Booking...' : 'Confirm Booking'}
-              </Button>
-              <p className="text-xs text-center text-muted-foreground">Overlapping bookings are automatically rejected</p>
-            </CardContent>
-          </Card>
-        </div>
+        
 
       </div>
     </div>

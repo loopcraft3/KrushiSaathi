@@ -414,11 +414,12 @@ const CategoryScreen: React.FC<{
               className={`group rounded-2xl border-2 border-border ${cat.border} bg-card hover:shadow-lg transition-all duration-300 hover:-translate-y-1 text-left overflow-hidden`}
             >
               {/* Category Image */}
-              <div className="w-full h-32 overflow-hidden">
+              <div className="w-full overflow-hidden" style={{ height: '160px' }}>
                 <img
                   src={cat.value ? CATEGORY_IMAGES[cat.value] || DEFAULT_IMAGE : DEFAULT_IMAGE}
                   alt={cat.label}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+                  style={{ aspectRatio: '16/9' }}
                   onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_IMAGE; }}
                 />
               </div>
@@ -689,7 +690,7 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
                           : 'border-border hover:border-primary/50'
                       }`}
                     >
-                      <EquipmentImage src={item.image_url} alt={item.name} type={item.type} className="..." />
+                      <div className="w-full overflow-hidden" style={{ height: "160px" }}><EquipmentImage src={item.image_url} alt={item.name} type={item.type} className="w-full h-full object-cover object-center" /></div>
                        <div className="p-3">
                         <div className="flex items-center justify-between mb-1">
                           <h3 className="font-semibold text-foreground">{item.name}</h3>
@@ -737,12 +738,14 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
                   <div className="space-y-3">
                     {list.map((booking) => (
                       <div key={booking._id} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/30">
-                        
-                       <EquipmentImage 
-                        src={booking.equipment_image} 
-                        alt={booking.equipment_name} 
-                        className="..." 
-                      />
+  
+                        <div className="flex-shrink-0 overflow-hidden rounded-lg" style={{ width: '56px', height: '56px' }}>
+                          <EquipmentImage
+                            src={booking.equipment_image}
+                            alt={booking.equipment_name || ''}
+                            className="w-full h-full object-cover object-center"
+                          />
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-foreground truncate">{booking.equipment_name}</p>
                           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
@@ -985,8 +988,10 @@ const VendorView: React.FC<{ userId: string }> = ({ userId }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {equipment.map((item) => (
                 <div key={item._id} className="rounded-xl border border-border overflow-hidden hover:shadow-md transition-shadow">
-                  <EquipmentImage src={item.image_url} alt={item.name} className="w-full h-36 object-cover" />
-                  <div className="p-3">
+                  <div className="w-full overflow-hidden" style={{ height: '160px' }}>
+                      <EquipmentImage src={item.image_url} alt={item.name} type={item.type} className="w-full h-full object-cover object-center" />
+                  </div> 
+                    <div className="p-3">
                     <div className="flex items-center justify-between mb-1">
                       <h3 className="font-semibold text-sm text-foreground">{item.name}</h3>
                       <Badge variant="secondary" className="text-xs">{item.type}</Badge>
@@ -1028,11 +1033,13 @@ const VendorView: React.FC<{ userId: string }> = ({ userId }) => {
             <div className="space-y-3">
               {bookings.map((booking) => (
                 <div key={booking._id} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/30">
-                  <EquipmentImage
-                    src={booking.equipment_image}
-                    alt={booking.equipment_name || ''}
-                    className="h-14 w-14 rounded-lg object-cover flex-shrink-0"
-                  />
+                  <div className="flex-shrink-0 overflow-hidden rounded-lg" style={{ width: '56px', height: '56px' }}>
+                    <EquipmentImage
+                      src={booking.equipment_image}
+                      alt={booking.equipment_name || ''}
+                      className="w-full h-full object-cover object-center"
+                    />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground truncate">{booking.equipment_name}</p>
                     <p className="text-xs text-muted-foreground truncate">Farmer: {booking.user_id}</p>

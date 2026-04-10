@@ -229,8 +229,6 @@ http://localhost:8000/docs
 
 ## ⚠️ Important Notes
 
-- Never commit `.env` files to GitHub — they contain secret keys
-- Never commit `venv/` or `node_modules/` — they are too large
 - The MongoDB Atlas database is shared across all team members
 - All team members must create their own `.env` file with the shared credentials
 
@@ -239,7 +237,7 @@ http://localhost:8000/docs
 ## 👥 Team
 
 Final Year Project — KrushiSaathi
-Department of Computer Engineering
+Department of Information Technology
 
 ---
 

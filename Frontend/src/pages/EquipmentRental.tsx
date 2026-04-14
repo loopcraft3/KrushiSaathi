@@ -16,6 +16,8 @@ import {
   deleteEquipment, getVendorBookings, getEquipmentAvailability,
 } from '@/services/rentalApi';
 import type { Equipment, Booking, BookedSlot } from '@/services/rentalApi';
+import { useAuth } from '@/contexts/AuthContext';
+import PageHeader from '@/components/PageHeader'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 // Default images per equipment type
@@ -445,7 +447,7 @@ const CategoryScreen: React.FC<{
 };
 
 // ── FARMER VIEW ──────────────────────────────────────────────────────
-const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
+const FarmerView: React.FC<{ token_str: string }> = ({ token_str }) => {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [history, setHistory] = useState<Booking[]>([]);
@@ -473,8 +475,8 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
       setLoading(true);
       const [eq, bk, hist] = await Promise.all([
         getAllEquipment(),
-        getMyBookings(userId),
-        getBookingHistory(userId),
+        getMyBookings(token_str),
+        getBookingHistory(token_str),
       ]);
       setEquipment(eq);
       setBookings(bk);
@@ -511,10 +513,7 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
     try {
       setBookingLoading(true);
       setError(null);
-      await createBooking(userId, {
-        equipment_id: selectedEquipment._id,
-        start_time: new Date(startTime).toISOString(),
-        end_time: new Date(endTime).toISOString(),
+      await createBooking(token_str, {
       });
       setSuccess(`✅ ${selectedEquipment.name} booked successfully!`);
       setSelectedEquipment(null);
@@ -531,7 +530,7 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
 
   const handleCancel = async (id: string) => {
     try {
-      await cancelBooking(userId, id);
+      await cancelBooking(token_str, id);
       setSuccess('Booking cancelled.');
       await loadData();
       setTimeout(() => setSuccess(null), 3000);
@@ -570,7 +569,7 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
           onBook={async (equipment, start, end) => {
             try {
               setError(null);
-              await createBooking(userId, {
+              await createBooking(token_str, {
                 equipment_id: equipment._id,
                 start_time: start,
                 end_time: end,
@@ -793,7 +792,7 @@ const FarmerView: React.FC<{ userId: string }> = ({ userId }) => {
 };
 
 // ── VENDOR VIEW ──────────────────────────────────────────────────────
-const VendorView: React.FC<{ userId: string }> = ({ userId }) => {
+const VendorView: React.FC<{ token_str: string }> = ({ token_str }) => {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -812,8 +811,8 @@ const VendorView: React.FC<{ userId: string }> = ({ userId }) => {
     try {
       setLoading(true);
       const [eq, bk] = await Promise.all([
-        getVendorEquipment(userId),
-        getVendorBookings(userId),
+        getVendorEquipment(token_str),
+        getVendorBookings(token_str),
       ]);
       setEquipment(eq);
       setBookings(bk);
@@ -855,10 +854,10 @@ const VendorView: React.FC<{ userId: string }> = ({ userId }) => {
       if (imageFile) formData.append('image', imageFile);
 
       if (editingEquipment) {
-        await updateEquipment(userId, editingEquipment._id, formData);
+        await updateEquipment(token_str, editingEquipment._id, formData);
         setSuccess('Equipment updated successfully!');
       } else {
-        await addEquipment(userId, formData);
+        await addEquipment(token_str, formData);
         setSuccess('Equipment added successfully!');
       }
       resetForm();
@@ -881,7 +880,7 @@ const VendorView: React.FC<{ userId: string }> = ({ userId }) => {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this equipment?')) return;
     try {
-      await deleteEquipment(userId, id);
+      await deleteEquipment(token_str, id);
       setSuccess('Equipment deleted.');
       await loadData();
       setTimeout(() => setSuccess(null), 3000);
@@ -905,25 +904,48 @@ const VendorView: React.FC<{ userId: string }> = ({ userId }) => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Equipment Name</label>
-                <input
-                  type="text" placeholder="e.g. Mahindra 575 Tractor"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Type</label>
-                <input
-                  type="text" placeholder="e.g. Tractor"
-                  value={form.type}
-                  onChange={(e) => setForm({ ...form, type: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="space-y-1">
+      <label className="text-sm font-medium">Equipment Name</label>
+      <input
+        type="text" placeholder="e.g. Mahindra 575 Tractor"
+        value={form.name}
+        onChange={(e) => setForm({ ...form, name: e.target.value })}
+        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+      />
+    </div>
+    <div className="space-y-1">
+      <label className="text-sm font-medium">Type</label>
+      <select
+        value={form.type === '__new__' ? 'new' : (['Tractor','Harvesting Equipment','Spraying Equipment','Tiller','Tillage Equipment','Sowing Equipment'].includes(form.type) || form.type === '' ? form.type : 'new')}
+        onChange={(e) => {
+          if (e.target.value === 'new') {
+            setForm({ ...form, type: '__new__' });
+          } else {
+            setForm({ ...form, type: e.target.value });
+          }
+        }}
+        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+      >
+        <option value="">Select type</option>
+        <option value="Tractor">Tractor</option>
+        <option value="Harvesting Equipment">Harvesting Equipment</option>
+        <option value="Spraying Equipment">Spraying Equipment</option>
+        <option value="Tiller">Tiller</option>
+        <option value="Tillage Equipment">Tillage Equipment</option>
+        <option value="Sowing Equipment">Sowing Equipment</option>
+        <option value="new">+ New Type</option>
+      </select>
+      {(form.type === '__new__' || !['Tractor','Harvesting Equipment','Spraying Equipment','Tiller','Tillage Equipment','Sowing Equipment',''].includes(form.type)) && (
+        <input
+          type="text"
+          placeholder="Enter new equipment type"
+          value={form.type === '__new__' ? '' : form.type}
+          onChange={(e) => setForm({ ...form, type: e.target.value })}
+          className="w-full mt-2 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+        />
+      )}
+    </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium">Price per Hour (₹)</label>
                 <input
@@ -1073,8 +1095,9 @@ const VendorView: React.FC<{ userId: string }> = ({ userId }) => {
 
 // ── MAIN PAGE ────────────────────────────────────────────────────────
 const EquipmentRental: React.FC = () => {
-  const { role, userId, setRole } = useRole();
-
+  const { user, token, logout } = useAuth();
+const role = user?.role;
+const token_str = token || '';
   if (!role) return <RoleSelector />;
 
   return (
@@ -1093,12 +1116,15 @@ const EquipmentRental: React.FC = () => {
             </p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setRole(null)}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Switch Role
-        </Button>
+        <button
+            onClick={logout}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            Logout ({user?.name})
+          </button>
       </div>
 
-      {role === 'farmer' ? <FarmerView userId={userId} /> : <VendorView userId={userId} />}
+      {role === 'farmer' ? <FarmerView token_str={token_str} /> : <VendorView token_str={token_str} />}
     </div>
   );
 };

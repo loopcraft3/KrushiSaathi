@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { getCropTypes, getSoilTypes, predictFertilizer } from "@/lib/fertilizer_api";
+import PageHeader from '@/components/PageHeader'
 
 const Index = () => {
   const [formData, setFormData] = useState({
@@ -104,7 +105,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header Section */}
+       {/* Header Section */}
       <header className="gradient-header py-16 px-4 text-center">
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-center mb-4">

@@ -18,41 +18,57 @@ import Chat from './pages/Chat';
 import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
-import NotFound from './pages/NotFound'; // Added missing import
-import './i18n'; // Initialize i18n
+import NotFound from './pages/NotFound';
+import './i18n';
 import EquipmentRental from './pages/EquipmentRental';
 import { RoleProvider } from '@/contexts/RoleContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import RentalAuth from './pages/RentalAuth';
+import AdminPanel from './pages/AdminPanel';
 
+// ── AUTH GATE ─────────────────────────────────────────────────────────
+const AppContent: React.FC = () => {
+  const { user, isLoading } = useAuth();
 
-const App: React.FC = (): JSX.Element => {
-  const [bubblePosition, setBubblePosition] = useState<{ x: number; y: number }>({ 
-    x: window.innerWidth - 100, 
-    y: window.innerHeight - 100 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <RentalAuth />;
+  }
+
+  return <AppInner />;
+};
+
+// ── MAIN UI ───────────────────────────────────────────────────────────
+const AppInner: React.FC = (): JSX.Element => {
+  const [bubblePosition, setBubblePosition] = useState<{ x: number; y: number }>({
+    x: window.innerWidth - 100,
+    y: window.innerHeight - 100,
   });
 
-  const queryClient = useMemo(() => new QueryClient(), []);
-
-  // Function to constrain position to viewport bounds
   const constrainToViewport = (pos: { x: number; y: number }): { x: number; y: number } => {
     const maxX = window.innerWidth - 80;
     const maxY = window.innerHeight - 80;
     return {
       x: Math.max(0, Math.min(pos.x, maxX)),
-      y: Math.max(0, Math.min(pos.y, maxY))
+      y: Math.max(0, Math.min(pos.y, maxY)),
     };
   };
 
-  // Handle window resize to keep bubble in view
   useEffect((): (() => void) => {
-    const handleResize = (e: Event): void => {
+    const handleResize = (): void => {
       setBubblePosition(prev => constrainToViewport(prev));
     };
-
-    window.addEventListener('resize', handleResize as EventListener);
-    return () => window.removeEventListener('resize', handleResize as EventListener);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Initialize bubble position on component mount
   useEffect(() => {
     const initialPosition = constrainToViewport(bubblePosition);
     if (initialPosition.x !== bubblePosition.x || initialPosition.y !== bubblePosition.y) {
@@ -61,91 +77,94 @@ const App: React.FC = (): JSX.Element => {
   }, []);
 
   return (
-    <ErrorBoundary>
-      <LanguageProvider>
-        <RoleProvider>  
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <Toaster />
-            <BrowserRouter>
-              <SidebarProvider>
-                <div className="min-h-screen flex w-full bg-background relative">
-                  {/* Move the navigation logic to a component that has access to useNavigate */}
-                  <ChatBubbleContainer 
-                    bubblePosition={bubblePosition} 
-                    setBubblePosition={setBubblePosition} 
-                  />
-                  {/* Sidebar */}
-                  <AppSidebar />
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background relative">
+        <ChatBubbleContainer
+          bubblePosition={bubblePosition}
+          setBubblePosition={setBubblePosition}
+        />
+        <AppSidebar />
 
-                  {/* Main Content */}
-                  <main className="flex-1 flex flex-col overflow-hidden">
-                    {/* Global Sidebar Trigger */}
-                    <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border/20 px-4 py-3 flex items-center justify-between relative">
-                      <div className="flex items-center space-x-4">
-                        <SidebarTrigger />
-                      </div>
-                      <div className="flex items-center">
-                        <LanguageSelector />
-                      </div>
-                    </div>
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border/20 px-4 py-3 flex items-center justify-between relative">
+            <div className="flex items-center space-x-4">
+              <SidebarTrigger />
+            </div>
+            <div className="flex items-center">
+              <LanguageSelector />
+            </div>
+          </div>
 
-                    {/* Content Area */}
-                    <div className="flex-1 overflow-auto p-6">
-                      <ErrorBoundary>
-                        <Routes>
-                          <Route path="/" element={<Dashboard />} />
-                          <Route path="/chat" element={<Chat />} />
-                          <Route path="/schemes" element={<GovernmentSchemes />} />
-                          <Route path="/fertilizer" element={<FertilizerAdvisor />} />
-                          <Route path="/crop-health" element={<CropHealth />} />
-                          <Route path="/notifications" element={<Notifications />} />
-                          <Route path="/profile" element={<Profile />} />
-                          <Route path="/settings" element={<Settings />} />
-                          <Route path="/rental" element={<EquipmentRental />} />
-                          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                          <Route path="*" element={<NotFound />} />
-                        </Routes>
-                      </ErrorBoundary>
-                    </div>
-                  </main>
-                  
-                </div>
-              </SidebarProvider>
-            </BrowserRouter>
-            <Sonner position="bottom-right" />
-          </TooltipProvider>
-        </QueryClientProvider>
-         </RoleProvider>
-      </LanguageProvider>
-    </ErrorBoundary>
+          <div className="flex-1 overflow-auto p-6 bg-[#f0fdf4] min-h-screen">
+            <ErrorBoundary>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/chat" element={<Chat />} />
+                <Route path="/schemes" element={<GovernmentSchemes />} />
+                <Route path="/fertilizer" element={<FertilizerAdvisor />} />
+                <Route path="/crop-health" element={<CropHealth />} />
+                <Route path="/notifications" element={<Notifications />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/rental" element={<EquipmentRental />} />
+                <Route path="/admin" element={<AdminPanel />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </ErrorBoundary>
+          </div>
+        </main>
+      </div>
+    </SidebarProvider>
   );
 };
 
-// Separate component to handle chat bubble with navigation
-const ChatBubbleContainer: React.FC<{ 
-  bubblePosition: { x: number; y: number }, 
-  setBubblePosition: (pos: { x: number; y: number }) => void 
+// ── CHAT BUBBLE ───────────────────────────────────────────────────────
+const ChatBubbleContainer: React.FC<{
+  bubblePosition: { x: number; y: number };
+  setBubblePosition: (pos: { x: number; y: number }) => void;
 }> = ({ bubblePosition, setBubblePosition }) => {
   const navigate = useNavigate();
-  
+
   const handleOpenChat = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    console.log('Navigating to chat page');
-    // Use both methods to ensure navigation works
-    window.location.pathname = '/chat';
     navigate('/chat');
   };
-  
+
   return (
     <div className="fixed z-50">
-      <FloatingFarmerBubble 
+      <FloatingFarmerBubble
         onOpenChat={handleOpenChat}
         isMinimized={false}
         position={bubblePosition}
         onPositionChange={setBubblePosition}
       />
     </div>
+  );
+};
+
+// ── ROOT ──────────────────────────────────────────────────────────────
+const App: React.FC = (): JSX.Element => {
+  const queryClient = useMemo(() => new QueryClient(), []);
+
+  return (
+    <ErrorBoundary>
+      <AuthProvider>
+        <LanguageProvider>
+          <RoleProvider>
+            <QueryClientProvider client={queryClient}>
+              <TooltipProvider>
+                <Toaster />
+                <BrowserRouter>
+                  <AppContent />
+                </BrowserRouter>
+                <Sonner position="bottom-right" />
+              </TooltipProvider>
+            </QueryClientProvider>
+          </RoleProvider>
+        </LanguageProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 };
 

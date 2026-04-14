@@ -14,7 +14,7 @@ from services.llm_service import llm_service
 from services.rag_service import rag_service
 from utils.config import settings, BACKEND_DIR, ENV_FILE
 
-from routers import rental
+from routers import rental, auth, admin
 
 
 # WebSocket connection manager moved to routers/websocket_chat.py
@@ -102,6 +102,8 @@ app.include_router(chat.router)
 app.include_router(voice_chat.router)
 app.include_router(websocket_chat.router)
 app.include_router(rental.router)
+app.include_router(auth.router)
+app.include_router(admin.router)
 
 @app.get("/")
 async def root():

@@ -5,9 +5,16 @@
 /* KrishiSaathi Design System - Organic-Tech Theme
 All colors MUST be HSL for perfect theming.
 */
+/* Light green tint for all page backgrounds */
+body {
+  background-color: #f0fff4;
+}
 
 @layer base {
   :root {
+    
+  --sidebar-background: #ffffff; /* keep sidebar white so it stands out */
+
     /* Core Organic-Tech Palette */
     --background: 40 20% 97%;
     --foreground: 120 15% 15%;

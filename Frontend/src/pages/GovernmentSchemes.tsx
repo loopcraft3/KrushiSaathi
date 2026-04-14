@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, FileText, ExternalLink, Filter, MapPin, Loader2, MessageCircle } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import PageHeader from '@/components/PageHeader'
 
 interface SchemeTemplate {
   id: number;
@@ -215,7 +216,7 @@ export const GovernmentSchemes: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-6">
-      {/* Header */}
+       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold mb-4 text-foreground">
           {t('pages.schemes.title', {})}

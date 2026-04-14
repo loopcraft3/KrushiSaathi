@@ -5,6 +5,7 @@ import { ChatInterface } from '@/components/ChatInterface';
 import { Sparkles, Camera, FileText, TrendingUp, Sun, TrendingDown } from 'lucide-react';
 import heroFarmingImage from '@/assets/farmer 5.png';
 import { useLanguage } from '@/contexts/LanguageContext';
+import PageHeader from '@/components/PageHeader'
 
 const Dashboard: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -25,7 +26,9 @@ const Dashboard: React.FC = () => {
   ], [t]);
 
   return (
+    
     <div className="min-h-screen bg-background">
+      <PageHeader icon="🏠" title="Dashboard" subtitle="Welcome to KrushiSaathi" />
       {/* Hero Section */}
       <section className="relative h-80 md:h-[28rem] overflow-hidden flex items-center justify-center" role="banner" aria-label="KrishiSaathi Hero Section">
         <img

@@ -1,451 +1,376 @@
-import { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import { Pencil, X, Check, Plus, Loader2, MapPin, Phone, Mail, CreditCard, Leaf } from 'lucide-react'
-import PageHeader from '../components/PageHeader'
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { User, MapPin, Crop, Edit, Save, X, Camera, Mail, Phone } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/contexts/AuthContext'; // ✅ FIX 1: import auth context
 
-const FARMER_TYPES = [
-  { value: 'wheat',        label: 'Wheat',        icon: '🌾' },
-  { value: 'kharif',       label: 'Kharif',       icon: '🌽' },
-  { value: 'rabi',         label: 'Rabi',         icon: '🌿' },
-  { value: 'horticulture', label: 'Horticulture', icon: '🍎' },
-  { value: 'mixed',        label: 'Mixed',        icon: '🌱' },
-  { value: 'dairy',        label: 'Dairy',        icon: '🐄' },
-  { value: 'organic',      label: 'Organic',      icon: '♻️' },
-]
-
-const FARMER_TYPE_META: Record<string, { label: string; icon: string }> = {
-  wheat:        { label: 'Wheat Farmer',     icon: '🌾' },
-  kharif:       { label: 'Kharif Farmer',    icon: '🌽' },
-  rabi:         { label: 'Rabi Farmer',      icon: '🌿' },
-  horticulture: { label: 'Horticulture',     icon: '🍎' },
-  mixed:        { label: 'Mixed Farming',    icon: '🌱' },
-  dairy:        { label: 'Dairy Farmer',     icon: '🐄' },
-  organic:      { label: 'Organic Farmer',   icon: '♻️' },
-  vendor:       { label: 'Equipment Vendor', icon: '🏪' },
+interface UserProfile {
+  name: string;
+  occupation: string;
+  location: string;
+  farmSize: string;
+  email: string;
+  phone: string;
+  bio: string;
+  crops: string[];
+  avatar?: string;
 }
 
-// ── AVATAR COMPONENT ─────────────────────────────────────────────────
-function ProfileAvatar({ name, role, size = 'lg' }: { name?: string; role?: string; size?: 'sm' | 'md' | 'lg' }) {
-  const initials = name
-    ? name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-    : '?'
-
-  const sizeClass = {
-    sm: 'w-10 h-10 text-sm',
-    md: 'w-16 h-16 text-xl',
-    lg: 'w-24 h-24 text-3xl',
-  }[size]
-
-  const roleEmoji = role === 'vendor' ? '🏪' : '👨‍🌾'
-  const badgeSizeClass = size === 'lg' ? 'w-8 h-8 text-base' : 'w-5 h-5 text-xs'
-
-  return (
-    <div className="relative inline-flex flex-shrink-0">
-      {/* Main circle with gradient + ring */}
-      <div
-        className={`${sizeClass} rounded-2xl flex items-center justify-center font-bold text-white shadow-lg ring-4 ring-white`}
-        style={{
-          background: 'linear-gradient(135deg, #14532d 0%, #16a34a 50%, #22c55e 100%)',
-          letterSpacing: '-0.02em',
-        }}
-      >
-        {initials}
-      </div>
-
-      {/* Role badge */}
-      <div
-        className={`absolute -bottom-1.5 -right-1.5 ${badgeSizeClass} rounded-xl flex items-center justify-center bg-white shadow-md border-2 border-green-100`}
-      >
-        {roleEmoji}
-      </div>
-    </div>
-  )
+// ✅ FIX 2: helper to map AuthContext User → local UserProfile shape
+function userToProfile(user: ReturnType<typeof useAuth>['user']): UserProfile {
+  if (!user) {
+    return {
+      name: '',
+      occupation: '',
+      location: '',
+      farmSize: '',
+      email: '',
+      phone: '',
+      bio: '',
+      crops: [],
+      avatar: undefined,
+    };
+  }
+  return {
+    name: user.name ?? '',
+    occupation: user.farmer_type ?? '',
+    location: user.place ?? user.village ?? '',
+    farmSize: user.land_area != null ? String(user.land_area) : '',
+    email: user.email ?? '',
+    phone: user.phone ?? '',
+    bio: user.bio ?? '',
+    crops: user.crops_grown ?? [],
+    avatar: undefined,
+  };
 }
 
-export default function Profile() {
-  const { user, updateProfile } = useAuth()
+const Profile: React.FC = () => {
+  const { t } = useLanguage();
+  const { user, updateProfile } = useAuth(); // ✅ FIX 3: consume auth context
 
-  const [editing, setEditing] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
-  const [error, setError] = useState('')
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [form, setForm] = useState({
-    name:        user?.name         || '',
-    phone:       user?.phone        || '',
-    village:     user?.village      || '',
-    place:       user?.place        || '',
-    aadhaar:     user?.aadhaar      || '',
-    land_area:   user?.land_area?.toString() || '',
-    farmer_type: user?.farmer_type  || '',
-    bio:         user?.bio          || '',
-    role:        user?.role         || 'farmer',
-  })
-  const [crops, setCrops] = useState<string[]>(user?.crops_grown || [])
-  const [cropInput, setCropInput] = useState('')
+  // ✅ FIX 4: derive profile from auth user, not hardcoded defaults
+  const profile = userToProfile(user);
+  const [editedProfile, setEditedProfile] = useState<UserProfile>(profile);
 
-  const startEdit = () => {
-    setForm({
-      name:        user?.name         || '',
-      phone:       user?.phone        || '',
-      village:     user?.village      || '',
-      place:       user?.place        || '',
-      aadhaar:     user?.aadhaar      || '',
-      land_area:   user?.land_area?.toString() || '',
-      farmer_type: user?.farmer_type  || '',
-      bio:         user?.bio          || '',
-      role:        user?.role         || 'farmer',
-    })
-    setCrops(user?.crops_grown || [])
-    setEditing(true)
-    setError('')
-    setSaveSuccess(false)
-  }
+  // ✅ FIX 5: sync edits if user changes in context (e.g. after re-login)
+  useEffect(() => {
+    setEditedProfile(userToProfile(user));
+  }, [user]);
 
-  const cancelEdit = () => { setEditing(false); setError('') }
+  const handleEdit = () => {
+    setEditedProfile(profile);
+    setSaveError(null);
+    setIsEditing(true);
+  };
 
-  const addCrop = () => {
-    const c = cropInput.trim()
-    if (c && !crops.includes(c)) setCrops(p => [...p, c])
-    setCropInput('')
-  }
+  const handleCancel = () => {
+    setEditedProfile(profile);
+    setSaveError(null);
+    setIsEditing(false);
+  };
 
-  const removeCrop = (c: string) => setCrops(p => p.filter(x => x !== c))
-
+  // ✅ FIX 6: handleSave actually calls updateProfile() → hits PUT /api/auth/me
   const handleSave = async () => {
-    setSaving(true)
-    setError('')
+    setIsSaving(true);
+    setSaveError(null);
     try {
       await updateProfile({
-        name:        form.name,
-        phone:       form.phone || undefined,
-        village:     form.village || undefined,
-        place:       form.place || undefined,
-        aadhaar:     form.aadhaar || undefined,
-        land_area:   form.land_area ? parseFloat(form.land_area) : undefined,
-        farmer_type: form.farmer_type || undefined,
-        bio:         form.bio || undefined,
-        crops_grown: crops,
-        role:        form.role as 'farmer' | 'vendor',
-      })
-      setSaveSuccess(true)
-      setEditing(false)
-      setTimeout(() => setSaveSuccess(false), 3000)
-    } catch (e: any) {
-      setError(e.message || 'Save failed')
+        name: editedProfile.name,
+        farmer_type: editedProfile.occupation,
+        place: editedProfile.location,
+        land_area: editedProfile.farmSize ? Number(editedProfile.farmSize) : undefined,
+        email: editedProfile.email,
+        phone: editedProfile.phone,
+        bio: editedProfile.bio,
+        crops_grown: editedProfile.crops,
+      });
+      setIsEditing(false);
+    } catch (err: any) {
+      setSaveError(err.message ?? 'Failed to save. Please try again.');
     } finally {
-      setSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
-  const ftMeta = user?.farmer_type
-    ? FARMER_TYPE_META[user.farmer_type]
-    : user?.role === 'vendor' ? FARMER_TYPE_META['vendor'] : null
+  const handleInputChange = (field: keyof UserProfile, value: string) => {
+    setEditedProfile(prev => ({ ...prev, [field]: value }));
+  };
 
-  const locationLine = [user?.village, user?.place].filter(Boolean).join(', ')
+  const handleCropAdd = (crop: string) => {
+    if (crop && !editedProfile.crops.includes(crop)) {
+      setEditedProfile(prev => ({ ...prev, crops: [...prev.crops, crop] }));
+    }
+  };
 
-  const inp = 'w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50 focus:bg-white transition'
-  const lbl = 'block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide'
+  const handleCropRemove = (crop: string) => {
+    setEditedProfile(prev => ({
+      ...prev,
+      crops: prev.crops.filter(c => c !== crop),
+    }));
+  };
+
+  // ✅ FIX 7: use editedProfile.crops during editing so removals show immediately
+  const displayCrops = isEditing ? editedProfile.crops : profile.crops;
+
+  const availableCrops = ['Wheat', 'Rice', 'Cotton', 'Sugarcane', 'Potato', 'Tomato', 'Onion', 'Corn'];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
-
-        {/* ── Green tint header ─────────────────────────────────────── */}
-        <PageHeader
-          icon={<Leaf className="h-7 w-7 text-white" />}
-          title="My Profile"
-          subtitle="Manage your personal and farming information"
-        >
-          <div className="flex items-center gap-2">
-            {saveSuccess && (
-              <span className="text-green-700 text-sm font-semibold flex items-center gap-1 bg-white px-3 py-1.5 rounded-xl border border-green-200">
-                <Check size={14} /> Saved!
-              </span>
-            )}
-            {!editing ? (
-              <button onClick={startEdit}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-white shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
-                style={{ background: 'linear-gradient(135deg, #14532d, #16a34a)' }}>
-                <Pencil size={14} /> Edit Profile
-              </button>
-            ) : (
-              <div className="flex gap-2">
-                <button onClick={cancelEdit}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-semibold text-sm text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition shadow-sm">
-                  <X size={14} /> Cancel
-                </button>
-                <button onClick={handleSave} disabled={saving}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-semibold text-sm text-white shadow-md transition-all hover:shadow-lg disabled:opacity-60"
-                  style={{ background: 'linear-gradient(135deg, #14532d, #16a34a)' }}>
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  {saving ? 'Saving…' : 'Save Changes'}
-                </button>
-              </div>
-            )}
-          </div>
-        </PageHeader>
-
-        {error && (
-          <div className="p-3.5 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm flex items-center gap-2">
-            ⚠️ {error}
+    <div className="container mx-auto px-4 py-8 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold mb-2 text-foreground">
+            {t('pages.profile.title', {})}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            {t('pages.profile.subtitle', {})}
+          </p>
+        </div>
+        {!isEditing ? (
+          <Button onClick={handleEdit} className="flex items-center gap-2">
+            <Edit className="h-4 w-4" />
+            {t('pages.profile.edit', {})}
+          </Button>
+        ) : (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="flex items-center gap-2">
+              <X className="h-4 w-4" />
+              {t('pages.profile.cancel', {})}
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2">
+              <Save className="h-4 w-4" />
+              {isSaving ? 'Saving...' : t('pages.profile.save', {})}
+            </Button>
           </div>
         )}
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          {/* ── Left card: avatar + summary ──────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col items-center text-center space-y-4">
-
-            {/* ── IMPROVED AVATAR ──────────────────────────────────── */}
-            <ProfileAvatar name={user?.name} role={user?.role} size="lg" />
-
-            <div className="space-y-1">
-              <h2 className="text-xl font-bold text-gray-800">{user?.name}</h2>
-              {ftMeta && (
-                <p className="text-gray-500 text-sm">{ftMeta.icon} {ftMeta.label}</p>
-              )}
-              {/* Role pill */}
-              <span className={`inline-block text-xs px-3 py-1 rounded-full font-semibold mt-1 ${
-                user?.role === 'vendor'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-green-100 text-green-700'
-              }`}>
-                {user?.role === 'vendor' ? '🏪 Vendor' : '👨‍🌾 Farmer'}
-              </span>
-            </div>
-
-            {/* Quick stats */}
-            <div className="w-full grid grid-cols-3 gap-2 pt-3 border-t border-gray-100">
-              <div className="text-center">
-                <div className="text-xl font-bold text-green-600">{user?.land_area ?? '—'}</div>
-                <div className="text-[10px] text-gray-400 uppercase tracking-wide">Acres</div>
-              </div>
-              <div className="text-center border-x border-gray-100">
-                <div className="text-xl font-bold text-green-600">{user?.crops_grown?.length ?? 0}</div>
-                <div className="text-[10px] text-gray-400 uppercase tracking-wide">Crops</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl font-bold text-green-600 capitalize">{user?.role}</div>
-                <div className="text-[10px] text-gray-400 uppercase tracking-wide">Role</div>
-              </div>
-            </div>
-
-            {/* Contact info */}
-            <div className="w-full space-y-2 text-sm text-left pt-3 border-t border-gray-100">
-              {locationLine && (
-                <div className="flex items-center gap-2 text-gray-600">
-                  <MapPin size={14} className="text-green-500 flex-shrink-0" />
-                  <span className="truncate">{locationLine}</span>
-                </div>
-              )}
-              {user?.email && (
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Mail size={14} className="text-green-500 flex-shrink-0" />
-                  <span className="truncate text-xs">{user.email}</span>
-                </div>
-              )}
-              {user?.phone && (
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Phone size={14} className="text-green-500 flex-shrink-0" />
-                  <span>{user.phone}</span>
-                </div>
-              )}
-              {user?.aadhaar && (
-                <div className="flex items-center gap-2 text-gray-600">
-                  <CreditCard size={14} className="text-green-500 flex-shrink-0" />
-                  <span className="text-xs">{user.aadhaar}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ── Right card: details / edit ────────────────────────────── */}
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
-
-            <div>
-              <h3 className="text-lg font-bold text-gray-800">Profile Details</h3>
-              <p className="text-gray-500 text-sm">Your personal and farming information</p>
-            </div>
-
-            {!editing ? (
-              /* ── VIEW MODE ──────────────────────────────────────────── */
-              <div className="space-y-5">
-
-                {/* Bio */}
-                <div>
-                  <div className={lbl}>Bio</div>
-                  <p className="text-gray-700 text-sm leading-relaxed">
-                    {user?.bio || <span className="text-gray-400 italic">No bio yet — click Edit Profile to add one.</span>}
-                  </p>
-                </div>
-
-                <div className="border-t border-gray-100" />
-
-                {/* Crops */}
-                <div>
-                  <div className={lbl}>Crops Grown</div>
-                  {user?.crops_grown && user.crops_grown.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {user.crops_grown.map(c => (
-                        <span key={c} className="px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-700 border border-amber-200">
-                          {c}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-400 text-sm italic">No crops added yet.</p>
-                  )}
-                </div>
-
-                <div className="border-t border-gray-100" />
-
-                {/* Info grid */}
-                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                  {[
-                    { label: 'Full Name',       value: user?.name },
-                    { label: 'Role',             value: user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '—' },
-                    { label: 'Phone',            value: user?.phone || '—' },
-                    { label: 'Email',            value: user?.email },
-                    { label: 'Village',          value: user?.village || '—' },
-                    { label: 'District / City',  value: user?.place || '—' },
-                    { label: 'Land Area',        value: user?.land_area ? `${user.land_area} acres` : '—' },
-                    { label: 'Farming Type',     value: ftMeta ? `${ftMeta.icon} ${ftMeta.label}` : '—' },
-                    { label: 'Aadhaar / ID',     value: user?.aadhaar || '—' },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="group">
-                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</div>
-                      <div className="text-sm text-gray-700 font-medium">{value}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-            ) : (
-              /* ── EDIT MODE ──────────────────────────────────────────── */
-              <div className="space-y-4">
-
-                {/* Role switcher */}
-                <div>
-                  <label className={lbl}>I am a</label>
-                  <div className="flex gap-3">
-                    {(['farmer', 'vendor'] as const).map(r => (
-                      <button key={r} type="button"
-                        onClick={() => setForm(f => ({ ...f, role: r }))}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${
-                          form.role === r
-                            ? 'border-green-500 bg-green-50 text-green-700'
-                            : 'border-gray-200 text-gray-400 hover:border-gray-300'
-                        }`}>
-                        {r === 'farmer' ? '👨‍🌾 Farmer' : '🏪 Vendor'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Name + Phone */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={lbl}>Full Name *</label>
-                    <input required value={form.name}
-                      onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                      className={inp} placeholder="Ramesh Patil" />
-                  </div>
-                  <div>
-                    <label className={lbl}>Phone</label>
-                    <input value={form.phone}
-                      onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                      className={inp} placeholder="9876543210" />
-                  </div>
-                </div>
-
-                {/* Village + Place */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={lbl}>Village</label>
-                    <input value={form.village}
-                      onChange={e => setForm(f => ({ ...f, village: e.target.value }))}
-                      className={inp} placeholder="Karad" />
-                  </div>
-                  <div>
-                    <label className={lbl}>District / City</label>
-                    <input value={form.place}
-                      onChange={e => setForm(f => ({ ...f, place: e.target.value }))}
-                      className={inp} placeholder="Satara" />
-                  </div>
-                </div>
-
-                {/* Land area + Farmer type */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={lbl}>Land Area (acres)</label>
-                    <input type="number" min="0" step="0.5" value={form.land_area}
-                      onChange={e => setForm(f => ({ ...f, land_area: e.target.value }))}
-                      className={inp} placeholder="e.g. 5" />
-                  </div>
-                  <div>
-                    <label className={lbl}>Farming Type</label>
-                    <select value={form.farmer_type}
-                      onChange={e => setForm(f => ({ ...f, farmer_type: e.target.value }))}
-                      className={inp + ' cursor-pointer'}>
-                      <option value="">Select type</option>
-                      {FARMER_TYPES.map(ft => (
-                        <option key={ft.value} value={ft.value}>{ft.icon} {ft.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Aadhaar */}
-                <div>
-                  <label className={lbl}>Aadhaar / Farmer ID</label>
-                  <input value={form.aadhaar}
-                    onChange={e => setForm(f => ({ ...f, aadhaar: e.target.value }))}
-                    className={inp} placeholder="XXXX-XXXX-XXXX" />
-                </div>
-
-                {/* Bio */}
-                <div>
-                  <label className={lbl}>Bio</label>
-                  <textarea value={form.bio}
-                    onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
-                    rows={3} className={inp + ' resize-none'}
-                    placeholder="Tell us about your farming experience…" />
-                </div>
-
-                {/* Crops grown */}
-                <div>
-                  <label className={lbl}>Crops Grown</label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {crops.map(c => (
-                      <span key={c} className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-700 border border-amber-200">
-                        {c}
-                        <button type="button" onClick={() => removeCrop(c)}
-                          className="ml-0.5 text-amber-500 hover:text-amber-700 transition-colors">
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <input value={cropInput}
-                      onChange={e => setCropInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCrop() } }}
-                      className={inp + ' flex-1'}
-                      placeholder="Type a crop and press Enter or +" />
-                    <button type="button" onClick={addCrop}
-                      className="px-3 py-2.5 rounded-xl bg-green-100 text-green-700 hover:bg-green-200 transition font-bold text-sm flex items-center gap-1">
-                      <Plus size={14} /> Add
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">e.g. Wheat, Rice, Cotton, Bajra</p>
-                </div>
-
-              </div>
-            )}
-          </div>
+      {/* ✅ FIX 8: show save error if backend rejects */}
+      {saveError && (
+        <div className="rounded-md bg-destructive/10 border border-destructive/30 text-destructive px-4 py-2 text-sm">
+          {saveError}
         </div>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Profile Card */}
+        <Card className="md:col-span-1 shadow-float">
+          <CardHeader className="text-center pb-4">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="relative">
+                <Avatar className="h-24 w-24 border-4 border-primary">
+                  <AvatarImage src={editedProfile.avatar ?? profile.avatar} alt={profile.name} />
+                  <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
+                    {profile.name.split(' ').map(n => n[0]).join('') || <User className="h-8 w-8" />}
+                  </AvatarFallback>
+                </Avatar>
+                {isEditing && (
+                  <Button
+                    size="icon"
+                    className="absolute bottom-0 right-0 rounded-full h-8 w-8"
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/*';
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            handleInputChange('avatar', event.target?.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      };
+                      input.click();
+                    }}
+                  >
+                    <Camera className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              {isEditing ? (
+                <Input
+                  value={editedProfile.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  className="text-center font-bold text-lg"
+                />
+              ) : (
+                <h2 className="text-2xl font-bold">{profile.name || '—'}</h2>
+              )}
+              {isEditing ? (
+                <Input
+                  value={editedProfile.occupation}
+                  onChange={(e) => handleInputChange('occupation', e.target.value)}
+                  className="text-center text-muted-foreground"
+                  placeholder="e.g. Wheat Farmer"
+                />
+              ) : (
+                <p className="text-muted-foreground">{profile.occupation || '—'}</p>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              {isEditing ? (
+                <Input
+                  value={editedProfile.location}
+                  onChange={(e) => handleInputChange('location', e.target.value)}
+                  className="flex-1"
+                  placeholder="e.g. Punjab, India"
+                />
+              ) : (
+                <span className="text-muted-foreground">{profile.location || '—'}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Crop className="h-4 w-4 text-muted-foreground" />
+              {isEditing ? (
+                <Input
+                  value={editedProfile.farmSize}
+                  onChange={(e) => handleInputChange('farmSize', e.target.value)}
+                  className="flex-1"
+                  placeholder="e.g. 50"
+                  type="number"
+                />
+              ) : (
+                <span className="text-muted-foreground">
+                  {profile.farmSize ? `${profile.farmSize} acres` : '—'}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              {isEditing ? (
+                <Input
+                  type="email"
+                  value={editedProfile.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  className="flex-1"
+                />
+              ) : (
+                <span className="text-muted-foreground">{profile.email || '—'}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              {isEditing ? (
+                <Input
+                  type="tel"
+                  value={editedProfile.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  className="flex-1"
+                />
+              ) : (
+                <span className="text-muted-foreground">{profile.phone || '—'}</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Details Card */}
+        <Card className="md:col-span-2 shadow-float">
+          <CardHeader>
+            <CardTitle>{t('pages.profile.details', {})}</CardTitle>
+            <CardDescription>
+              {t('pages.profile.detailsDesc', {})}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Bio */}
+            <div>
+              <Label htmlFor="bio" className="text-base font-medium">{t('pages.profile.bio', {})}</Label>
+              {isEditing ? (
+                <Textarea
+                  id="bio"
+                  value={editedProfile.bio}
+                  onChange={(e) => handleInputChange('bio', e.target.value)}
+                  className="mt-2"
+                  rows={4}
+                />
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">{profile.bio || '—'}</p>
+              )}
+            </div>
+
+            {/* Crops */}
+            <div>
+              <Label className="text-base font-medium">{t('pages.profile.crops', {})}</Label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {/* ✅ FIX 7 applied here: use displayCrops so edits are reflected immediately */}
+                {displayCrops.map((crop) => (
+                  <Badge key={crop} variant="secondary" className="text-sm">
+                    {crop}
+                    {isEditing && (
+                      <button
+                        onClick={() => handleCropRemove(crop)}
+                        className="ml-2 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </Badge>
+                ))}
+                {displayCrops.length === 0 && (
+                  <span className="text-sm text-muted-foreground">No crops added yet.</span>
+                )}
+              </div>
+              {isEditing && (
+                <Select onValueChange={handleCropAdd}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder={t('pages.profile.addCrop', {})} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCrops
+                      .filter(crop => !editedProfile.crops.includes(crop))
+                      .map((crop) => (
+                        <SelectItem key={crop} value={crop}>
+                          {crop}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Statistics */}
+            <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary">20+</div>
+                <div className="text-xs text-muted-foreground">
+                  {t('pages.profile.yearsExperience', {})}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary">{profile.crops.length}</div>
+                <div className="text-xs text-muted-foreground">
+                  {t('pages.profile.cropsCount', {})}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary">{profile.farmSize || '—'}</div>
+                <div className="text-xs text-muted-foreground">
+                  {t('pages.profile.acres', {})}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
-  )
-}
+  );
+};
+
+export default Profile;

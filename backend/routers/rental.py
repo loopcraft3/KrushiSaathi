@@ -1,15 +1,20 @@
 # routers/rental.py
 from fastapi import APIRouter, HTTPException, Header, UploadFile, File, Form
 from typing import Optional
-import os, shutil, uuid
+import os, uuid
+import cloudinary
+import cloudinary.uploader
 from models.rental_schemas import BookingCreateSchema
 from services import rental_service
 
 router = APIRouter(prefix="/api/rental", tags=["Equipment Rental"])
 
-# Folder to save uploaded images
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "static", "equipment_images")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# Cloudinary config
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET")
+)
 
 
 from services.auth_service import get_current_user
@@ -124,12 +129,13 @@ async def add_equipment(
 
         # Save image if provided
         if image and image.filename:
-            ext = image.filename.split(".")[-1]
-            filename = f"{uuid.uuid4()}.{ext}"
-            filepath = os.path.join(UPLOAD_DIR, filename)
-            with open(filepath, "wb") as f:
-                shutil.copyfileobj(image.file, f)
-            image_url = f"/static/equipment_images/{filename}"
+            contents = await image.read()
+            result = cloudinary.uploader.upload(
+                contents,
+                folder="krushisaathi/equipment",
+                public_id=str(uuid.uuid4())
+            )
+            image_url = result["secure_url"]
 
         equipment = await rental_service.add_equipment(
             vendor_id, name, type, price_per_hour, image_url
@@ -157,12 +163,13 @@ async def update_equipment(
         if price_per_hour: updates["price_per_hour"] = price_per_hour
 
         if image and image.filename:
-            ext = image.filename.split(".")[-1]
-            filename = f"{uuid.uuid4()}.{ext}"
-            filepath = os.path.join(UPLOAD_DIR, filename)
-            with open(filepath, "wb") as f:
-                shutil.copyfileobj(image.file, f)
-            updates["image_url"] = f"/static/equipment_images/{filename}"
+            contents = await image.read()
+            result = cloudinary.uploader.upload(
+                contents,
+                folder="krushisaathi/equipment",
+                public_id=str(uuid.uuid4())
+            )
+            updates["image_url"] = result["secure_url"]
 
         equipment = await rental_service.update_equipment(equipment_id, vendor_id, updates)
         return {"success": True, "message": "Equipment updated", "data": equipment}
